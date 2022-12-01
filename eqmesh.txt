@@ -1,0 +1,416 @@
+import numpy as np
+from scipy.stats import norm
+from scipy.stats import lognorm
+
+ecu_mesh_alpha = np.linspace(-2,2,7)
+Vult_mesh_alpha = np.linspace(-2,2,7)
+
+ecu_mesh_cdf, Vult_mesh_cdf = norm.cdf(ecu_mesh_alpha,0,1) , norm.cdf(Vult_mesh_alpha,0,1)
+ecu_mesh = -np.exp(norm.ppf(ecu_mesh_cdf, loc=np.log(0.006),scale=np.sqrt(np.log(1+0.35**2))))
+Vult_mesh = np.exp(norm.ppf(ecu_mesh_cdf, loc=np.log(170),scale=np.sqrt(np.log(1+0.20**2))))
+
+ecu_mesh, Vult_mesh = np.meshgrid(ecu_mesh,Vult_mesh)
+pars_mesh = np.array([ecu_mesh.flatten(),Vult_mesh.flatten()]).T
+
+ecu_mesh_alpha, Vult_mesh_alpha = np.meshgrid(ecu_mesh_alpha,Vult_mesh_alpha)
+pars_mesh_alpha = np.array([ecu_mesh_alpha.flatten(),Vult_mesh_alpha.flatten()]).T
+
+
+pars_mesh_alpha
+
+
+#ecu_list = -np.random.lognormal(np.log(0.006),np.sqrt(np.log(1+0.35**2)),7)
+#Vult_list = np.random.lognormal(np.log(170),np.sqrt(np.log(1+0.20**2)),7)
+
+ecu_list = pars_mesh[:,0]
+Vult_list = pars_mesh[:,1]
+Vult_list
+
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Aug 15 10:30:50 2022
+
+@author: GML
+"""
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jun 23 16:49:45 2022
+
+@author: GML
+"""
+### Unconfined model
+
+
+# =============================================================================
+# ناقصه ايه؟
+# curvature (np), identification of failure location
+# failure case (list + identify minimum value then column index then conc or steel)
+# identify plastic hinge length (0.5H or 0.8H) (0.5L or 0.8L)
+# =============================================================================
+
+## pushover
+
+import openseespy.opensees as ops
+import opsvis as opsv
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import math
+import xlsxwriter
+import itertools as itools
+import subprocess as sp
+import time
+from google.colab import files
+
+start_time = time.time()
+tmp = sp.call('cls',shell=True)
+
+
+def ReadRecord (inFilename, outFilename):       
+    dt = 0.0
+    npts = 0 
+    inFileID = open(inFilename, 'r')
+    outFileID = open(outFilename, 'w')
+    flag = 0	
+    for line in inFileID:
+        if line == '\n':
+            continue
+        elif flag == 1:
+            outFileID.write(line)
+        else:
+            words = line.split()
+            lengthLine = len(words)
+            if lengthLine >= 4:
+                if words[0] == 'NPTS=':
+                    for word in words:
+                        if word != '':
+                            if flag == 1:
+                                dt = float(word)
+                                break
+                            if flag == 2:
+                                npts = int(word.strip(','))
+                                flag = 0
+                            if word == 'DT=' or word == 'dt':
+                                flag = 1
+                            if word == 'NPTS=':
+                                flag = 2
+                elif words[-1] == 'DT':
+                    count = 0
+                    for word in words:
+                        if word != '':
+                            if count == 0:
+                                npts = int(word)
+                            elif count == 1:
+                                dt = float(word)
+                            elif word == 'DT':
+                                flag = 1
+                                break
+                            count += 1
+    inFileID.close()
+    outFileID.close()
+    return dt, npts 
+
+g = 9.81
+record_list = ['RSN126_GAZLI_GAZ000','RSN461_MORGAN_HVR240','RSN518_PALMSPR_FVR045','RSN599_WHITTIER.A_A-FLO020','RSN721_SUPER.B_B-ICC090','RSN766_LOMAP_G02000','RSN828_CAPEMEND_PET000','RSN864_LANDERS_JOS090' ,'RSN1044_NORTHR_NWH360','RSN1148_KOCAELI_ARE000','RSN1197_CHICHI_CHY028-E','RSN1605_DUZCE_DZC270']
+record_list = ['RSN864_LANDERS_JOS090' ,'RSN1044_NORTHR_NWH360','RSN1148_KOCAELI_ARE000','RSN1197_CHICHI_CHY028-E','RSN1605_DUZCE_DZC270']
+record_list = ['RSN864_LANDERS_JOS090' ,'RSN1044_NORTHR_NWH360','RSN1148_KOCAELI_ARE000']
+
+
+pgv_list = [66.19,39.32,6.28,7.13,41.77,34.74,49.30,42.57,96.54,13.95,61.36,84.19]
+pgv_list = [42.57,96.54,13.95,61.36,84.19]
+pgv_list = [42.57,96.54,13.95]
+
+factor_list = np.linspace(40,5,8)
+
+#ecu_list = -np.random.lognormal(np.log(0.006),np.sqrt(np.log(1+0.35**2)),100)
+#ecu_list = [-0.005924442,-0.00772675,-0.013545649,-0.00901247,-0.003506722,-0.007092183,-0.007381962,-0.008154278,-0.004187907,-0.008004508,-0.009505736,-0.00336255,-0.005304342,-0.009431272,-0.004588768,-0.005093327,-0.004842458,-0.005134085,-0.003185122,-0.005931321,-0.005739578,-0.005181489,-0.0115711,-0.009609232,-0.007430786,-0.002903147,-0.014795575,-0.003794893,-0.006158067,-0.006526151,-0.007652888,-0.004944772,-0.01003776,-0.005390272,-0.003752258,-0.009685951,-0.007721796,-0.005131259,-0.005165335,-0.004931493,-0.007218608,-0.005823512,-0.008209526,-0.002995674,-0.012491824,-0.006836911,-0.010542627,-0.005297686,-0.006109857,-0.005364322,-0.002995486,-0.004661702,-0.013614027,-0.004783763,-0.004625167,-0.007738597,-0.005884797,-0.004680182,-0.003783154,-0.002461323,-0.007806794,-0.005964706,-0.00462457,-0.003582145,-0.006764716,-0.004048549,-0.00549509,-0.007520309,-0.008346628,-0.007597217,-0.004549586,-0.004968043,-0.004569822,-0.005774641,-0.007445371,-0.007060306,-0.006242101,-0.008027812,-0.007002075,-0.006345116,-0.005418213,-0.005968391,-0.009850764,-0.005336366,-0.005382892,-0.005734467,-0.007636128,-0.006695104,-0.009115978,-0.011658936,-0.008786786,-0.006565472,-0.004480754,-0.004036159,-0.01121418,-0.005113807,-0.006085705,-0.004488987,-0.005978649,-0.003804162]
+#Vult_list = np.random.lognormal(np.log(170),np.sqrt(np.log(1+0.20**2)),100)
+#Vult_list = [136.9371686,151.4804575,196.0564288,185.2042502,149.3198906,190.4362193,147.2971462,163.9751102,195.561081,100.1860828,195.92741,210.727919,143.5863373,193.4267568,135.2553652,179.6842474,154.48516,204.5419112,232.8360121,236.8246216,159.7762744,212.2606253,137.5731784,151.3439052,207.6287597,136.5147253,159.1274599,195.2435348,147.5762255,146.7405288,153.3185278,140.5080573,145.9149827,188.2551264,102.7134928,150.7403602,195.5226854,134.7596983,115.284131,147.9888106,189.0757106,237.3861761,148.4207638,140.8759315,137.5442234,116.7455898,186.3489041,146.0329869,243.4414165,192.5544348,160.2710351,158.7549207,276.7864416,226.5617813,161.4512815,193.523724,186.4593682,149.8267856,124.8851597,204.7938436,115.3061643,171.6718078,162.5481385,141.5230657,181.2307547,189.2200501,193.8148239,194.2225511,108.808975,187.7151771,167.6795543,178.2555266,158.7088912,110.8688908,150.6877807,140.6007824,204.4378652,186.6835405,164.9402778,194.5034771,215.2148938,171.540809,247.6488958,139.2433607,222.7718958,214.4987289,135.354769,175.5458602,169.7928809,181.5075384,181.4087592,129.4542123,177.1673326,227.7244838,185.1907728,230.3876091,200.1837038,149.6064185,151.3637307,167.058565]
+
+#z_flist_ultdvlpd = np.full((len(factor_list),len(record_list),len(ecu_list)),False)
+#z_flist_cnvrg = np.zeros((len(factor_list),len(record_list),len(ecu_list)))
+#z_flist_n4dsp = np.zeros((len(factor_list),len(record_list),len(ecu_list)))
+#z_flist_tstrn = np.zeros((len(factor_list),len(record_list),len(ecu_list)))
+#z_flist_bstrn = np.zeros((len(factor_list),len(record_list),len(ecu_list)))
+#z_flist_c2shr = np.zeros((len(factor_list),len(record_list),len(ecu_list)))                                                             
+
+                     # result - IM - record - ecu - Vult - Vb - ect - ecb - umax -uindex 
+
+ultimate_result = pd.DataFrame(np.zeros((len(factor_list)*len(record_list)*len(ecu_list),10)),columns=['state','IM','record','ecu','Vult','Vbmax','ect','ecb','uindex','convergence'])
+
+
+j1 = 0
+#ultlocid = pd.DataFrame(z_flist_ultdvlpd)
+
+z_cstrn=np.zeros((18002,8,len(factor_list),len(record_list),len(ecu_list)))
+
+        # [lowerstrain BOT, upperstrain BOT,lowerstrain TOP, upperstrain TOP]
+
+Tcalc_0 = 0
+
+
+for r1,record,pgv in zip(itools.count(),record_list,pgv_list):    
+    dt, nPts = ReadRecord('Data_Input/'+record+'.AT2', 'Data_Output/'+record+'.dat')
+    for f1, factor in enumerate(factor_list):
+        for e1,ecu,Vult in zip(itools.count(),ecu_list,Vult_list):    
+                print("==========================")
+                print("Starting RCFrameGravity example")
+                
+                ops.wipe()
+                ops.model('basic', '-ndm', 2, '-ndf', 3)
+                
+                bay,height1,height2 = 8.0,4.0,3.0
+                
+                ops.node(1, 0.0, 0.0)
+                ops.node(2, bay, height1-height2)
+                ops.node(3, 0.0, height1)
+                ops.node(4, bay, height1)
+                
+                ops.fix(1, 1, 1, 1)
+                ops.fix(2, 1, 1, 1)
+                
+                ops.equalDOF(3,4,1,3)
+                          
+                fcu,Ec,ftc = [-30*10**3, 30*10**6,38340.0679]
+                fy, Es, bs = [400*10**3,200*10**6,0.03]
+                ec0 = ecu/3 # ازاي حسبتها؟؟
+                if ec0 > -0.002:
+                  ec0 = -0.002
+                
+                ops.uniaxialMaterial('Concrete04', 1, fcu, ec0,  ecu,  Ec, ftc)
+                #ops.uniaxialMaterial('Concrete04', 2, fcu, ec0,  ecu,  Ec, ftc)
+                ops.uniaxialMaterial('Steel02', 3, fy, Es, bs)
+                
+                seccol,bc,tc,cover,phic,ntopc,nbotc = [1,0.2,0.5,0.025,0.014,4,4]
+                z1c, y1c, Asc = [bc/2,tc/2,math.pi*phic**2/4]
+                fib_sec_col = [['section', 'Fiber', seccol, '-GJ', 0.0e6],
+                            ['patch', 'rect', 1, 18, 1,-y1c,-z1c, y1c,z1c],
+                            ['layer', 'straight', 3, ntopc, Asc, y1c - cover-phic/2, z1c - cover-phic/2, y1c - cover-phic/2, cover - z1c+phic/2],
+                            ['layer', 'straight', 3, nbotc, Asc, cover - y1c+phic/2, z1c - cover-phic/2, cover - y1c+phic/2, cover - z1c+phic/2]]
+                opsv.fib_sec_list_to_cmds(fib_sec_col)
+                
+                secbij,bb,tb,cover,phib,ntopbij,nbotbij = [2,0.2,0.7,0.025,0.016,4,2]
+                z1b, y1b, Asb = [bb/2,tb/2,math.pi*phib**2/4]
+                fib_sec_bij = [['section', 'Fiber', secbij, '-GJ', 0.0],
+                            ['patch', 'rect', 1, 18, 1,-y1b,-z1b,y1b,z1b],
+                            ['layer', 'straight', 3, ntopbij, Asb, y1b - cover-phib/2, z1b - cover-phib/2, y1b - cover-phib/2, cover - z1b+phib/2],
+                            ['layer', 'straight', 3, nbotbij, Asb, cover - y1b+phib/2, z1b - cover-phib/2, cover - y1b+phib/2, cover - z1b+phib/2]]
+                opsv.fib_sec_list_to_cmds(fib_sec_bij)
+                
+                secbms,bb,tb,cover,phib,ntopbms,nbotbms = [3,0.2,0.7,0.02,0.016,2,4]
+                z1b, y1b, Asb = [bb/2,tb/2,math.pi*phib**2/4]
+                fib_sec_bms = [['section', 'Fiber', secbms, '-GJ', 0.0],
+                            ['patch', 'rect', 1, 18, 1,-y1b,-z1b,y1b,z1b],
+                            ['layer', 'straight', 3, ntopbms, Asb, y1b - cover-phib/2, z1b - cover-phib/2, y1b - cover-phib/2, cover - z1b+phib/2],
+                            ['layer', 'straight', 3, nbotbms, Asb, cover - y1b+phib/2, z1b - cover-phib/2, cover - y1b+phib/2, cover - z1b+phib/2]]
+                opsv.fib_sec_list_to_cmds(fib_sec_bms)
+                
+                
+                ops.uniaxialMaterial('Elastic', 4,10**0)
+                #section Aggregator $secTag $matTag1 $dof1 <-section $sectionTag>
+                ops.section('Aggregator',20,       4,      'P', '-section',secbij)
+                ops.section('Aggregator',30,       4,      'P', '-section',secbms)
+                
+                ops.geomTransf('Linear', 1)
+                #plc = 0.08*L(m)       + 0.022*phi(m)*fy(MPa)
+                plc1=(0.08*0.5*height1)+(0.022*phic*fy*10**-3)
+                #plc1= 0.496 #height = L
+                
+                
+                plc2=(0.08*0.5*height2)+(0.022*phic*fy*10**-3)
+                ops.beamIntegration('HingeRadau', 1, 1, plc1,1,plc1,1)
+                ops.beamIntegration('HingeRadau', 2, 1, plc2,1,plc2,1)
+                
+                #               e          tag ndI ndJ transfTag integrationTag
+                ops.element('forceBeamColumn', 1,   1,  3,    1,           1)
+                ops.element('forceBeamColumn', 2,   2,  4,    1,           2)
+                
+                ops.geomTransf('Linear', 2)
+                plbm=(0.08*0.5*bay)+(0.022*phib*fy*10**-3)
+                
+                ops.beamIntegration('HingeRadau', 3, 2, plbm,2,plbm,30)
+                #               e             tag  ndI ndJ transfTag integrationTag
+                ops.element('forceBeamColumn', 3,   3,  4,    2,           3)
+        
+        
+                ops.timeSeries('Linear', 1)
+                ops.pattern('Plain', 1, 1)
+        
+              
+                P, Wz = 500.0, 36.0
+                #       nd  FX, FY, MZ
+                ops.load(3, 0.0, -P, 0.0)
+                ops.load(4, 0.0, -P, 0.0)
+                ops.eleLoad('-ele', 3, '-type', '-beamUniform', -Wz)
+                
+                n= Es/Ec
+        
+                colIz = (0.2*0.5**3/12)+(n-1)*(nbotc*Asc)*(z1c-cover-phic/2)**2+(n-1)*(ntopc*Asc)*(z1c-cover-phic/2)**2
+                Kl= 12*Ec*colIz*(1/(height1**3)+1/(height2**3))
+        
+                Tn = 0.48
+                massl = ((Tn**2)*Kl)/(4*(math.pi**2))
+                
+                
+                # node#,     mx   my  mz
+                ops.mass(3, massl/4, 0, 0.0)					
+                ops.mass(4, massl/4, 0, 0.0)
+                
+                ops.system('BandGeneral')
+                ops.constraints('Transformation')
+                ops.numberer('RCM')
+                ops.test('NormDispIncr', 1.0e-12, 10, 3)
+                ops.algorithm('Newton')
+                ops.integrator('LoadControl', 0.1)
+                ops.analysis('Static')
+                
+                ops.analyze(10)
+                '''                
+                eigenValue = np.array(ops.eigen('fullGenLapack',1))
+                Tcalc_0 = 2*math.pi/np.sqrt(eigenValue[0])
+                '''
+                print("==========================")
+                
+                # =============================================================================
+                # 
+                print("Start RCFrameEarthquake Example")
+                # 
+                # =============================================================================
+                
+                ops.wipeAnalysis()
+                ops.loadConst('-time', 0.0)   
+                        
+                ops.timeSeries('Path', 2, '-filePath', 'Data_Output/'+record+'.dat', '-dt', dt, '-factor', factor*9.81/(pgv))
+                ops.pattern('UniformExcitation',  2,   1,  '-accel', 2)
+                #ops.rayleigh(0.0, 0.0, 0.0, 0.000625)
+                ops.system('BandGeneral')
+                ops.constraints('Plain')
+                ops.test('NormDispIncr', 1.0e-12,  10 )
+                ops.algorithm('Newton')
+                ops.numberer('RCM')
+                ops.integrator('Newmark',  0.5,  0.25 )
+                ops.analysis('Transient')
+                tFinal, tCurrent, ok = nPts*dt, ops.getTime(), 0
+                ops.record()
+                
+                i = 0
+                z_v1 = []
+                z_v2 = []
+
+                while ok == 0 and tCurrent < tFinal:
+                    
+                    tCurrent = ops.getTime()
+                    
+                    z_v1.append(abs(ops.eleForce(1,1))),z_v2.append(abs(ops.eleForce(2,1)))
+                    # [BOT lowerstrain, BOT upperconc strain,TOP lowerstrain, TOP upperstrain]
+                    z_cstrn[i,0,f1,r1,e1],z_cstrn[i,1,f1,r1,e1],z_cstrn[i,2,f1,r1,e1],z_cstrn[i,3,f1,r1,e1]=ops.eleResponse(1, 'section', 1, 'fiber', -y1c, 0, 1, 'stressStrain')[1],ops.eleResponse(1, 'section', 1, 'fiber', y1c, 0, 1, 'stressStrain')[1],ops.eleResponse(1, 'section', 6, 'fiber', -y1c, 0, 1, 'stressStrain')[1],ops.eleResponse(1, 'section', 6, 'fiber', y1c, 0, 1, 'stressStrain')[1]
+                    z_cstrn[i,4,f1,r1,e1],z_cstrn[i,5,f1,r1,e1],z_cstrn[i,6,f1,r1,e1],z_cstrn[i,7,f1,r1,e1]=ops.eleResponse(2, 'section', 1, 'fiber', -y1c, 0, 1, 'stressStrain')[1],ops.eleResponse(2, 'section', 1, 'fiber', y1c, 0, 1, 'stressStrain')[1],ops.eleResponse(2, 'section', 6, 'fiber', -y1c, 0, 1, 'stressStrain')[1],ops.eleResponse(2, 'section', 6, 'fiber', y1c, 0, 1, 'stressStrain')[1]
+                           
+                    if ultimate_result.loc[j1,'state'] == False and min(z_cstrn[i,:,f1,r1,e1]) < ecu:
+                        ultimate_result.loc[j1,'uindex'] = i
+                        ultimate_result.loc[j1,'state'] = 'FAIL!'
+                    if ultimate_result.loc[j1,'state'] == False and max(max(z_v1),max(z_v2),abs(min(z_v1)),abs(min(z_v2))) > Vult:
+                        ultimate_result.loc[j1,'uindex'] = i
+                        ultimate_result.loc[j1,'state'] = "FAIL!"
+                       
+                    ok = ops.analyze(1, dt)    
+                    
+                    if ok != 0:
+                        print("modified newton failed")
+                        print("regular newton failed .. lets try an initail stiffness for this step")
+                        ops.test('NormDispIncr', 1.0e-12,  100, 0)
+                        ops.algorithm('ModifiedNewton', '-initial')
+                        ok =ops.analyze( 1, dt)
+                        if ok == 0:
+                            print('Succeded, returning back to Newton Algorithm')    
+                            ops.algorithm('Newton')
+                    if ok != 0:
+                        print("Trying Newton with Initial Tangent")
+                        ops.test("EnergyIncr",1.e-8,6,0)
+                        ops.algorithm("Newton", '-initial')
+                        ok =ops.analyze( 1, dt)
+                        if ok == 0:
+                            print('Succeded, returning back to Newton Algorithm')    
+                            ops.test("NormDispIncr", 1.e-8,2000,0)
+                            ops.algorithm('Newton') 
+                    if ok!=0:
+                        print("Trying Broyden ..")
+                        ops.algorithm("Broyden", 8)
+                        ok =ops.analyze( 1, dt)
+                        if ok == 0:
+                            print('Succeded, returning back to Newton Algorithm')    
+                            ops.algorithm('Newton')        
+                    if ok!=0:
+                        print("Trying NewtonWithLineSearch")
+                        ops.algorithm("NewtonLineSearch",0.8)
+                        ok =ops.analyze( 1, dt)
+                        if ok == 0:
+                            print('Succeded, returning back to Newton Algorithm')    
+                            ops.algorithm('Newton')        
+                    if ok!=0:
+                        print('Failed to converge :( breaking the loop')
+                        ultimate_result.loc[j1,'convergence'] = 'FAILED'
+                        break
+                    
+                    i = i+1
+            
+                ops.wipe()
+        
+                # =============================================================================
+                # Postprocessing Stage
+                # =============================================================================
+                print("End of time history analysis, Postprocessing has started....")
+            
+                            # 0result - 1IM - 2record - 3ecu - 4Vult - 5Vbmax - 6ect - 7ecb - 8umax -9uindex 
+                
+                ultimate_result.loc[j1,'IM'] = factor  #IM
+                ultimate_result.loc[j1,'record'] = record  #record 
+                ultimate_result.loc[j1,'ecu'] = ecu     #ecu 
+                ultimate_result.loc[j1,'Vult'] = Vult    #V
+                
+                #ultimate_result.loc[j1,'umax'] = max(abs(min(z_u4x[:,0,f1,r1,e1])),max(z_u4x[:,0,f1,r1,e1]))
+                ultimate_result.loc[j1,'ect'] = min(min(z_cstrn[:,6,f1,r1,e1]),min(z_cstrn[:,7,f1,r1,e1]))
+                ultimate_result.loc[j1,'ecb'] = min(min(z_cstrn[:,4,f1,r1,e1]),min(z_cstrn[:,5,f1,r1,e1]))
+                ultimate_result.loc[j1,'Vbmax'] = max(z_v1+z_v2)
+                
+                
+                # result - IM - record - ecu - Vult - Vb - ect - ecb - umax 
+        
+                j1= j1+1
+        
+        def graphPlotter(x,y,lbl,ttl,xlbl,ylbl):
+            fig, ax = plt.subplots(figsize=(11,7))
+            ax.plot(x, y, label=lbl)
+
+#np.savetxt('Data_Output/zz_faillist.txt', z_flist_ultdvlpd[:,0,:], delimiter=' ', fmt='%1.0f') 
+
+np.savetxt('Data_Output/zz_factorlist.txt', factor_list, delimiter=' ', fmt='%1.2f')
+textfile = open("Data_Output/zz_recordlist.txt", "w")
+for element in record_list:
+    textfile.write(element + "\n")
+textfile.close()
+
+#np.savetxt('Data_Output/zz_maxV2.txt', z_flist_c2shr, delimiter=' ', fmt='%1.5f')
+#np.savetxt('Data_Output/zz_maxu4.txt', z_flist_n4dsp, delimiter=' ', fmt='%1.5f')
+#np.savetxt('Data_Output/zz_concstrain_bottomsection.txt', z_flist_bstrn, delimiter=' ', fmt='%1.5f')
+#np.savetxt('Data_Output/zz_concstrain_topsection.txt', z_flist_tstrn, delimiter=' ', fmt='%1.5f')
+
+
+
+'''
+np.savetxt('Data_Output/zz_factorlist.txt', factor_list, delimiter=' ', fmt='%1.2f')
+textfile = open("Data_Output/zz_recordlist.txt", "w")
+for element in record_list:
+    textfile.write(element + "\n")
+textfile.close()
+np.savetxt('Data_Output/zz_maxV2.txt', z_flist_c2shr, delimiter=' ', fmt='%1.5f')
+np.savetxt('Data_Output/zz_maxu4.txt', z_flist_n4dsp, delimiter=' ', fmt='%1.5f')
+np.savetxt('Data_Output/zz_concstrain_bottomsection.txt', z_flist_bstrn, delimiter=' ', fmt='%1.5f')
+np.savetxt('Data_Output/zz_concstrain_topsection.txt', z_flist_tstrn, delimiter=' ', fmt='%1.5f')
+'''
+
+#ultlocid.to_csv('Data_Output/zz_failureloc.txt', sep=' ',index=False,header=record_list)
+
+print("--- %s seconds ---" % (time.time() - start_time))        
+ultimate_result.to_csv('zz_ultimate_result.csv',index=False)
+files.download('zz_ultimate_result.csv')

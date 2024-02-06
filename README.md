@@ -33,7 +33,6 @@ The file `2_Results_of_MC_RSM_ANN_StdCase.ipynb` presents the results and analys
 2. **Response Surface:** This section is about the application of Central Composite Design as a sampling method, the preparation of the training dataset, creating a pivot table, calculating fragility model parameters, and plotting response surfaces, residual errors, and RMSE for points.
 
 3. **Artificial Neural Networks (ANN):** The study explores the utilization of ANN for predicting fragility model parameters. Sections cover preparing the training dataset, calculating fragility model parameters, training the ANN, developing the median ANN model, and plotting relevant visualizations.
----
 
 Please refer to the respective notebooks for detailed code implementations, analysis procedures, and visualizations.
 

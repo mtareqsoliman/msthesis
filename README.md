@@ -1,5 +1,7 @@
-##Project Overview
+##Project Overview:
+
 This project is a part of a study that explores the application of machine learning techniques in developing seismic fragility models for structures with multiple interdependent failure modes. Our research explores the benefits and limitations of machine learning algorithms when used as an alternative approach to traditional time history analysis in developing fragility models.
+
 ##Motivation
 The motivation behind this project stemmed from the need to address the limitations of existing fragility curve development methods in the literature, particularly in capturing the complex relationships between multiple failure mechanisms. [(Liel et al. 2009)](https://doi.org/10.1016/j.strusafe.2008.06.002) introduced fragility curve development incorporating structural and record-to-record uncertainties, our study aims to enhance the accuracy and efficiency of fragility modeling through machine learning.
 ##Methodology

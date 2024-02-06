@@ -41,4 +41,5 @@ Please refer to the respective notebooks for detailed code implementations, anal
 Our findings revealed the limitations of traditional polynomial equations in capturing nonlinear relationships between failure mechanisms. However, artificial neural networks (ANN) demonstrated superior performance in developing median fragility models compared to the Response Surface Methodology (RSM) with Central Composite Design (CCD). Furthermore, The study observed a specific transition zone between controlling failure mechanisms, suggesting potential areas for optimization in future analyses.
 
 # Please see
-Soliman, M.T.M. (2023). _Application of machine learning algorithms in seismic fragility analysis of structures_. Masters Thesis, Istanbul Technical University, [Türkiye](https://tez.yok.gov.tr).
+* Soliman, M.T.M. (2023). _Application of machine learning algorithms in seismic fragility analysis of structures_. Masters Thesis, Istanbul Technical University, [Türkiye](https://tez.yok.gov.tr).
+*  SOLIMAN M.T.M., YAZGAN U. (2022). “Exploring the benefits and limitations of machine learning techniques in seismic fragility assessment”. Proceedings of Dokuz Eylül University International Symposium on Graduate Research DEUISGR22-GeoScience, December 8-9, 2022. Izmir, Türkiye. 
